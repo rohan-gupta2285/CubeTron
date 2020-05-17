@@ -1,0 +1,688 @@
+
+<html>
+<head>
+<title>My third Three.js app</title>
+  <style>
+  
+   body {
+      background-image: url('images/screenshot.jpg');
+      
+      font-family: Georgia, Helvetica, sans-serif;
+      font-weight: bold;
+      margin: 0;
+      overflow: hidden;
+      padding: 0;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    #hud {
+      bottom: 10px;
+      position: absolute;
+      right: 10px;
+      z-index: 100;
+    }
+    #credits {
+      font-size: 12px;
+      position: absolute;
+      text-align: center;
+      top: 10px;
+      width: 100%;
+      z-index: 100;
+    }
+    p {
+      background-color: #EEEEEE;
+      border: 1px solid black;
+      display: inline-block;
+      margin: 0;
+      padding: 5px;
+    }
+  </style>
+  <script src="jquery-1.7.2.min.js"></script>
+</head>
+
+<body>
+					<script src="three.js/build/three.min.js"></script> 
+					<script type="text/javascript" src="MTLLoader.js" ></script>
+					<script type="text/javascript" src="OBJLoader.js" ></script>
+						
+					<canvas id="myCanvas" width="200" height="100"></canvas>
+			<h1 align="center" id="end"></h1>
+					
+<script>
+//declares the basic variables for the game
+var scene;
+var camera;
+var renderer;
+var mesh, geometry, material;
+var floor;
+var ambientLight, light;
+var meshTexture, meshNormalMap, meshBumpMap;
+var keyboard = {};
+var player = { height:2, speed:0.5, turnSpeed:Math.PI*0.02, canShoot:0,kills:0, ammo:50}; //object to store player data
+var USE_WIREFRAME = false; //toggles the wireframe
+var col=false;
+var boxX=[];// x position of each wall segment
+var boxZ=[];// z position of each wall segment
+var clock;
+var posx=0;//outer wall generation
+var posz=0; //outer wall generation
+var enemyBar=[]; //enemy health tracker
+var crate=[];
+var timer, minutes, seconds, display;
+var lastAmmoPickup=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];//creates an array for ammo crates
+// An object to hold all the things needed for our loading screen
+var loadingScreen = {
+	scene: new THREE.Scene(),
+	camera: new THREE.PerspectiveCamera(90, window.innerWidth/window.innerHeight, 0.1, 100),
+	box: new THREE.Mesh(
+		new THREE.BoxGeometry(0.5,0.5,0.5),
+		new THREE.MeshBasicMaterial({ color:0x4444ff })
+	)
+};
+
+
+
+
+var loadingManager = null;
+var RESOURCES_LOADED = false;
+//object to hold our models
+var models = {
+	uzi: {
+		obj:"models/Models/uziGoldLong.obj",
+		mtl:"models/Models/uziGoldLong.mtl",
+		mesh: null,
+		castShadow:false
+	},
+		ammo_uzi: {
+		obj:"models/Models/ammo_uzi.obj",
+		mtl:"models/Models/ammo_uzi.mtl",
+		mesh: null,
+		castShadow:false
+	}
+};
+
+// Meshes index
+var meshes = {};
+
+// bullets array
+var bullets = [];
+
+// enemy bullets
+var eBullets= [];
+// enemies
+var enemies = [];
+
+//Sets up the game
+function init(){
+	scene = new THREE.Scene();
+	camera = new THREE.PerspectiveCamera(90, window.innerWidth/window.innerHeight, 0.1, 1000); //sets the width and height according to the users window
+	
+	clock = new THREE.Clock(); //starts a clock
+	
+	
+	
+	// Set up the loading screen's scene.
+	loadingScreen.box.position.set(0,0,5);
+	loadingScreen.camera.lookAt(loadingScreen.box.position);
+	loadingScreen.scene.add(loadingScreen.box);
+	
+	// Create a loading manager to set RESOURCES_LOADED when appropriate.
+	// Pass loadingManager to all resource loaders.
+	loadingManager = new THREE.LoadingManager();
+	
+	//runs when one item is loaded
+	loadingManager.onProgress = function(item, loaded, total){
+		console.log(item, loaded, total);
+	};
+	//runs when all items are loaded
+	loadingManager.onLoad = function(){
+		console.log("loaded all resources");
+		RESOURCES_LOADED = true;
+		onResourcesLoaded();
+	};
+	
+	
+//Version date: January 17, 2017-Jan 20, 2017 | Oerall time: 19 hours
+//Previous versions inspired by THREE.js/examples
+
+//used jquery to create kills, ammo and timer
+	$('body').append('<div id="hud"><p>Kills: <span id="kills">0</span><br />Ammo: <span id="ammo">50</span><br/>Time: <span id="time"></span></p></div>');
+	$('body').append('<div id="credits"><p>Ccode created by: Talha Awan and Rohan Gupta using <a href="http://mrdoob.github.com/three.js/">Three.js</a><br />Inspired by <a href="http://icecreamyou.github.io/Nemesis/game.html">Nemesis</a> - Isaac Sukin & <a href="https://www.youtube.com/user/xSaucecodexSaucecode ">xSaucecode</a> </br> WASD to move, Arrow keys to look, Space to shoot</p></div>');
+	
+	//texture loader
+		var textureLoader= new THREE.TextureLoader(loadingManager);
+	
+    //creates floor
+        floor = new THREE.Mesh(
+		new THREE.PlaneGeometry(600,600),
+		new THREE.MeshPhongMaterial({color:0xffffff, map:meshTexture})
+	);
+	floor.rotation.x -= Math.PI / 2; // Rotate the floor 90 degrees
+	floor.position.z+=100/2-5;
+	floor.receiveShadow = true; //Floor can have shadows cast onto it
+	scene.add(floor);
+	
+    meshTexture = new textureLoader.load ("textures/wall.png");
+	
+	//main lighting
+	ambientLight= new THREE.AmbientLight (0xffffff,0.2);
+	scene.add(ambientLight);
+	
+	//torch
+	light =new THREE.PointLight (0xffffff, 1.5, 18);
+	light.position.set(0.5, player.height, -5);
+	light.castShadow = true;
+	//light will not act on anything closer than 0.1 m or farther than 25m
+	light.shadow.camera.near=0.1;
+	light.shadow.camera.far=300;
+	scene.add(light);
+
+	//random terrain generator
+					geometry = new THREE.BoxGeometry( 20, 30, 20 ); //declares sizes for each box segment
+				
+					for ( var i = 0; i < 200; i++ ) {
+					material = new THREE.MeshPhongMaterial( { color: 0xffffff, map:meshTexture } );
+                    var mesh = new THREE.Mesh( geometry, material );
+					//randomly generates location
+					mesh.position.x = Math.floor( Math.random() * 20 - 10 ) * 20;
+					mesh.position.z = Math.floor( Math.random() * 20 - 10 ) * 20;
+					//if location is anywhere within a 20 unit radius of the center generate new position
+					while (Math.abs(mesh.position.x)<=20 && Math.abs(mesh.position.z+2)<=20){
+					mesh.position.x = Math.floor( Math.random() * 20 - 10 ) * 20;
+					mesh.position.z = Math.floor( Math.random() * 20 - 10 ) * 20;
+					}
+					//move each wall segment half its length up 
+					mesh.position.y+=15;
+					boxX[i]=mesh.position.x;
+					boxZ[i]=mesh.position.z;
+					//allow them to cast shadow
+				    mesh.receiveShadow = true; 
+	                mesh.castShadow = true;
+					scene.add( mesh );
+                    
+					}
+					
+					
+					//wall generation
+					for ( var i = 0; i < 24; i++ ) {
+						//generates 4 walls around the map
+					material = new THREE.MeshPhongMaterial( { color: 0xffffff, map:meshTexture } );
+                    var mesh = new THREE.Mesh( geometry, material );//uses same geometry so textures don't have to be resized
+					mesh.position.x+=-220+posx;
+					mesh.position.z+=-220;
+					mesh.position.y+=15;
+					boxX.push(mesh.position.x) //adds them to the same array that holds info for map walls so collisions apply to both 
+					boxZ.push(mesh.position.z)
+				    mesh.receiveShadow = true; 
+	                mesh.castShadow = true;
+					scene.add( mesh );
+					var mesh1= new THREE.Mesh( geometry, material );
+					mesh1.position.x+=-220+posx;
+					mesh1.position.z+=220;
+					mesh1.position.y+=15;
+					boxX.push(mesh1.position.x)
+					boxZ.push(mesh1.position.z)
+					mesh1.receiveShadow = true; 
+	                mesh1.castShadow = true;
+					scene.add( mesh1 );
+                    posx+=20;
+					var mesh2= new THREE.Mesh( geometry, material );
+					mesh2.position.x+=-220;
+					mesh2.position.z+=-220+posz;
+					mesh2.position.y+=15;
+					boxX.push(mesh2.position.x)
+					boxZ.push(mesh2.position.z)
+				    mesh2.receiveShadow = true; 
+	                mesh2.castShadow = true;
+					scene.add( mesh2 );
+					var mesh3= new THREE.Mesh( geometry, material );
+					mesh3.position.x+=220;
+					mesh3.position.z+=-220+posz;
+					mesh3.position.y+=15;
+					boxX.push(mesh3.position.x)
+					boxZ.push(mesh3.position.z)
+					mesh3.receiveShadow = true; 
+	                mesh3.castShadow = true;
+					scene.add( mesh3 );
+                    posz+=20;
+					
+
+					}
+					addAI(); //generates the enemies
+					
+					//generates ammo crates
+					for (var z=0;z<15;z++){
+						var crateTexture = textureLoader.load ("textures/crate1/crate1_diffuse.png");
+						var crateBumpMap=textureLoader.load ("textures/crate1/crate1_bump.png");
+						var crateNormalMap=textureLoader.load ("textures/crate1/crate1_normal.png");
+						var ammoCrate= new THREE.Mesh (
+						new THREE.CubeGeometry (2,2,2), 
+						new THREE.MeshPhongMaterial  ({ color: 0xffffff, map:crateTexture, bumpMap:crateBumpMap, normalMap:crateNormalMap   } )
+						);
+						
+					ammoCrate.position.x = Math.floor( Math.random() * 20 - 10 ) * 20;
+					ammoCrate.position.z = Math.floor( Math.random() * 20 - 10 ) * 20;
+										//if location is anywhere within a 20 unit radius of the center generate new position
+					while (Math.abs(ammoCrate.position.x)<=10 && Math.abs(ammoCrate.position.z+2)<=10){
+					ammoCrate.position.x = Math.floor( Math.random() * 20 - 10 ) * 20;
+					ammoCrate.position.z = Math.floor( Math.random() * 20 - 10 ) * 20;
+					}
+					//move each wall segment half its length up 
+					ammoCrate.position.y=1.25;
+
+					//allow them to cast shadow
+				    ammoCrate.receiveShadow = true; 
+	                ammoCrate.castShadow = true;
+					scene.add( ammoCrate);
+					crate.push(ammoCrate);
+					}
+					
+					
+				
+	// Load models - taken from Xsaucecode
+	//Wrap the code in a function and pass it the index. If you
+	// don't, then the index '_key' can change while the model is being
+	// downloaded, and so the wrong model will be matched with the wrong
+	// index key.
+	for( var _key in models ){
+		(function(key){
+			//loads the material and objects for the models
+			var mtlLoader = new THREE.MTLLoader(loadingManager);
+			mtlLoader.load(models[key].mtl, function(materials){
+				materials.preload();
+				
+				var objLoader = new THREE.OBJLoader(loadingManager);
+				
+				objLoader.setMaterials(materials);
+				objLoader.load(models[key].obj, function(mesh){
+					//transverse to make it possible to  cast and recieve shadows
+					mesh.traverse(function(node){
+						if( node instanceof THREE.Mesh ){
+							if('castShadow' in models[key])
+								node.castShadow = models[key].castShadow;
+							else
+								node.castShadow = true;
+							
+							if('receiveShadow' in models[key])
+								node.receiveShadow = models[key].receiveShadow;
+							else
+								node.receiveShadow = true; 
+						}
+					});
+					models[key].mesh = mesh;
+					
+				});
+			});
+			
+		})(_key);
+}
+	//initial camera settings
+	camera.position.set(0, player.height, -2);
+	camera.lookAt(new THREE.Vector3(0,player.height,0));
+	
+	//sets the renderer
+	renderer = new THREE.WebGLRenderer();
+	renderer.setSize(window.innerWidth, window.innerHeight);
+	
+	//Enable shadows in renderer
+	renderer.shadowMap.enabled=true;
+	renderer.shadowMap.type=THREE.BasicShadowMap;
+	
+	//adds the renderer to the document
+	document.body.appendChild(renderer.domElement);
+	
+	//calls the animate function
+	animate();
+}
+
+//wall collisions, checks whether the cameras or bullet coordinates are within the box 11 represents the distance from box origin for collisions to register
+ function checkCollisions(x,z){
+ for (var n=0; n<boxX.length;n++){
+   if (x>Math.min(boxX[n]-11,boxX[n]+11) && x<Math.max(boxX[n]-11,boxX[n]+11) && z>Math.min(boxZ[n]-11, boxZ[n]+11) && z<Math.max (boxZ[n]-11, boxZ[n]+11)){
+   col=true;
+   break;
+		}
+	}
+    return col;
+} 
+
+//checks if enemy is colliding with any wall, if max point of enemy is > min point of wall and min point of enemy is < max of wall for x and z coordinates
+ function enemyCollision (x,z,d) {
+for (var n=0; n<boxX.length; n++){
+if (Math.max(x+d,x-d)>Math.min(boxX[n]-11,boxX[n]+11)&& Math.min(x+d,x-d)<Math.max(boxX[n]-11,boxX[n]+11) && Math.max(z+d,z-d)>Math.min(boxZ[n]-11, boxZ[n]+11) && Math.min(z+d,z-d)<Math.max (boxZ[n]-11, boxZ[n]+11)){
+col=true;
+break;
+		}
+	}
+return col;
+}
+
+//if bullet is within enemy hit box 
+ function bulletCollision (x,z,d) {
+for (var n=0; n<bullets.length; n++){
+if (bullets[n].position.x>Math.min(x+d,x-d)&& bullets[n].position.x<Math.max(x+d,x-d) && bullets[n].position.z>Math.min(z+d,z-d) && bullets[n].position.z<Math.max(z+d,z-d)){
+col=true;
+bullets[n].alive = false;
+scene.remove(bullets[n]);
+break;
+		}
+	}
+return col;
+}
+
+function distance (x1,x2,y1,y2) { //used to find the distance between two points, used to find camera distance from ammo crate 
+return Math.sqrt( (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2) );
+}
+
+ // Runs when all resources are loaded - Xsaucecode
+function onResourcesLoaded(){
+	
+	// Clone models into meshes.
+	meshes["playerweapon"] = models.uzi.mesh.clone();
+	
+	// Reposition individual meshes, then add meshes to scene
+	meshes["playerweapon"].position.set(0,2,0);
+	meshes["playerweapon"].scale.set(10,10,10);
+	scene.add(meshes["playerweapon"]);
+	
+}
+
+//Adds enemies
+function addAI () {
+					//enemy generation
+				var textureLoader= new THREE.TextureLoader(loadingManager);
+				meshTexture = new textureLoader.load ("textures/face.png");
+				var geometry1 = new THREE.BoxGeometry( 3, 3, 3 );
+				var len=enemies.length;
+					for ( var l = 0; l < 30-len; l++ ) { //generates 30 - current enemies in scene
+					material = new THREE.MeshPhongMaterial( { color: 0xffffff, map:meshTexture } );
+                    var enemy = new THREE.Mesh( geometry1, material );
+					//generates a random position for enemies
+					enemy.position.x = Math.floor( Math.random() * 20 - 10 ) * 20;
+					enemy.position.z = Math.floor( Math.random() * 20 - 10 ) * 20;
+					enemy.position.y+=2;
+					while (Math.abs(enemy.position.x)<=30 && Math.abs(enemy.position.z+2)<30 ||enemyCollision(enemy.position.x,enemy.position.z,2.2)){//make sure enemies are not generated in center or in walls
+					enemy.position.x = Math.floor( Math.random() * 20 - 10 ) * 20;
+					enemy.position.z = Math.floor( Math.random() * 20 - 10 ) * 20;
+					if (col==true)
+					col=false;
+					}
+					//declares enemy informtion
+					enemy.receiveShadow = true; 
+	                enemy.castShadow = true;
+					enemy.health=100;
+					enemy.lastRandomX=Math.random(); //stores random generation into math. last random so enemies continue going in previous direction
+					enemy.lastRandomZ=Math.random();
+					scene.add(enemy);//adds enemy to the scene
+					enemy.healthBar=new THREE.Mesh( new THREE.BoxGeometry( 1, 1, 1), new THREE.MeshBasicMaterial( { color: 0x00ff00} )); //creates enemy health bar
+                    enemy.healthBar.position.set(enemy.position.x, enemy.position.y+3, enemy.position.z); //makes health bar follow enemy 
+					scene.add(enemy.healthBar); //adds health bar to the scene
+					enemies.push(enemy); //adds all enemy info to the enemies array so it can be called later
+					}
+}
+
+//starts timer
+function startTimer(duration, display) {
+    timer = duration, minutes, seconds;
+    setInterval(function () {
+         minutes = parseInt(timer / 60, 10);
+        seconds = parseInt(timer % 60, 10);
+
+        minutes = minutes < 10 ? "0" + minutes : minutes;
+        seconds = seconds < 10 ? "0" + seconds : seconds;
+
+        display.text(minutes + ":" + seconds);
+
+        if (--timer < 0) {
+            timer = duration;
+        }
+    }, 1000);
+}
+
+//runs when program starts
+jQuery(function ($) {
+    var twoMinutes = 60 * 2,
+        display = $('#time');
+    startTimer(twoMinutes, display);
+});
+
+//gives game over message once timer is up
+function endScreen(){
+	document.getElementById("end").innerHTML = "Game Over. Refresh To Play Again.";
+}
+
+function animate(){
+	//stops function when timer reaches 0
+if (timer==0){
+endScreen();
+return;
+}
+//updates timer
+$('#time').html(minutes + ":" + seconds);
+	// This block runs while resources are loading.
+	if( RESOURCES_LOADED == false ){
+		requestAnimationFrame(animate);
+		
+		loadingScreen.box.position.x -= 0.05;
+		if( loadingScreen.box.position.x < -10 ) loadingScreen.box.position.x = 10;
+		loadingScreen.box.position.y = Math.sin(loadingScreen.box.position.x);
+		
+		renderer.render(loadingScreen.scene, loadingScreen.camera);
+		return; // Stop the function here.
+	}
+	
+	requestAnimationFrame(animate);
+	//sets new timer
+	var time = Date.now() * 0.0005;
+	
+	//checks for ammo pick up
+	for (var n=0;n<15;n++){
+	crate[n].rotation.y += 0.02;
+	if (Date.now()>lastAmmoPickup[n]+30000){ //if it's been 30 seconds since last pick up
+		if (distance(camera.position.x, crate[n].position.x, camera.position.z, crate[n].position.z) <1.2 && player.ammo!=50){ // collision is happening with player and ammo is not 50
+		player.ammo=Math.min(player.ammo+15, 50); //add 15 to player's ammo or set it to 50 if 
+		$('#ammo').html(player.ammo); //update ammo on hud
+		lastAmmoPickup[n]=Date.now(); //resets last ammo pick up for crate
+		}
+		crate[n].material.wireframe=false; //wireframe on if true
+	}
+	else {
+		crate[n].material.wireframe=true; //wireframe true if 30 seconds over
+	}
+	}
+	// go through bullets array and update position
+	// remove bullets when appropriate 
+	//goes through array backwards so removing doesn't interfere with other bullets
+	for(var index=bullets.length-1; index>=0; index-=1){
+		if( bullets[index] === undefined ) continue;
+		if( bullets[index].alive == false ){
+			bullets.splice(index,1);
+			continue;
+		}
+		//adds velocity to bullets current position
+		bullets[index].position.add(bullets[index].velocity);
+}
+
+
+	// Keyboard movement inputs
+	if(keyboard[87]){ // W key
+		camera.position.x -= Math.sin(camera.rotation.y) * player.speed;
+		camera.position.z -= -Math.cos(camera.rotation.y) * player.speed;
+		if (checkCollisions(camera.position.x,camera.position.z)){
+		camera.position.x += Math.sin(camera.rotation.y) * player.speed;
+		camera.position.z += -Math.cos(camera.rotation.y) * player.speed;
+		col=false;
+		}
+	}
+	if(keyboard[83]){ // S key
+		camera.position.x += Math.sin(camera.rotation.y) * player.speed;
+		camera.position.z += -Math.cos(camera.rotation.y) * player.speed;
+				if (checkCollisions(camera.position.x,camera.position.z)){
+		camera.position.x -= Math.sin(camera.rotation.y) * player.speed;
+		camera.position.z -= -Math.cos(camera.rotation.y) * player.speed;
+		col=false;
+		}
+	}
+	if(keyboard[65]){ // A key
+		// Redirect motion by 90 degrees
+		camera.position.x += Math.sin(camera.rotation.y + Math.PI/2) * player.speed;
+		camera.position.z += -Math.cos(camera.rotation.y + Math.PI/2) * player.speed;
+				if (checkCollisions(camera.position.x,camera.position.z)){
+		camera.position.x -= Math.sin(camera.rotation.y + Math.PI/2) * player.speed;
+		camera.position.z -= -Math.cos(camera.rotation.y + Math.PI/2) * player.speed;
+		col=false;
+		}
+	}
+	if(keyboard[68]){ // D key
+		camera.position.x += Math.sin(camera.rotation.y - Math.PI/2) * player.speed;
+		camera.position.z += -Math.cos(camera.rotation.y - Math.PI/2) * player.speed;
+				if (checkCollisions(camera.position.x,camera.position.z)){
+		camera.position.x -= Math.sin(camera.rotation.y - Math.PI/2) * player.speed;
+		camera.position.z -= -Math.cos(camera.rotation.y - Math.PI/2) * player.speed;
+		col=false;
+		}
+	}
+
+	// Keyboard turn inputs
+	if(keyboard[37]){ // left arrow key
+		camera.rotation.y -= player.turnSpeed;
+	}
+	if(keyboard[39]){ // right arrow key
+		camera.rotation.y += player.turnSpeed;
+	}
+	// shoot a bullet
+	if(keyboard[32] && player.canShoot <= 0 && player.ammo>0){ // if space is pressed, player.canShoot=true and ammo>0 player can shoot
+		// import model
+		var bullet = models.ammo_uzi.mesh.clone();
+		bullet.scale.set(10,10,10);
+		//bullet rotation
+		
+		// position the bullet to come from the player's weapon
+		bullet.position.set(
+			meshes["playerweapon"].position.x,
+			meshes["playerweapon"].position.y + 0.15,
+			meshes["playerweapon"].position.z
+		);
+		// set the velocity of the bullet
+		bullet.velocity = new THREE.Vector3(
+			-Math.sin(camera.rotation.y),
+			0,
+			Math.cos(camera.rotation.y)
+		);
+		
+		// after 1000ms, set alive to false and remove from scene
+		// setting alive to false flags our update code to remove
+		// the bullet from the bullets array
+		bullet.alive = true;
+		setTimeout(function(){
+			bullet.alive = false;
+			scene.remove(bullet);
+		}, 1000);
+		
+		// add to scene, array, and set the delay to 15 frames
+		bullets.push(bullet);
+		scene.add(bullet);
+		player.canShoot = 15;
+		player.ammo-=1;
+		$('#ammo').html(player.ammo);
+	}
+if(player.canShoot > 0) player.canShoot -= 1;
+
+//removes bulllets if collision with walls
+for (g=0; g<bullets.length;g++){
+		if (checkCollisions(bullets[g].position.x,bullets[g].position.z)){
+			bullets[g].alive = false;
+			scene.remove(bullets[g]);
+			col=false;
+			continue;
+			}
+		}
+		
+	//AI functions
+	for (var t=0;t<enemies.length;t++){
+	var r=Math.random();
+	if (r>0.995){ //enemies keep moving in same direction 99.5% of the time
+	enemies[t].lastRandomX=Math.random()*2-1;
+	enemies[t].lastRandomZ=Math.random()*2-1;
+		}
+		enemies[t].translateX(0.3*enemies[t].lastRandomX);
+		enemies[t].translateZ(0.3*enemies[t].lastRandomZ);
+		
+	if (enemyCollision(enemies[t].position.x,enemies[t].position.z,2.8)){ //enemies generate new random direction if collision is happening
+	enemies[t].translateX(-2*0.3*enemies[t].lastRandomX);
+	enemies[t].translateZ(-2*0.3*enemies[t].lastRandomZ);
+	enemies[t].lastRandomX=Math.random()*2-1;
+	enemies[t].lastRandomZ=Math.random()*2-1;
+	
+	col=false; //collision is set to false for next function call
+	
+	}
+	enemies[t].healthBar.position.set(enemies[t].position.x,enemies[t].position.y+3,enemies[t].position.z); //repositions the enemies health bar
+		
+	//if bullet hits enemy
+	if (bulletCollision(enemies[t].position.x,enemies[t].position.z,1.5)){
+	enemies[t].health-=10;//enemy health decreases by 10
+	//enemy health
+	if (enemies[t].health<=0){//if enemy health reaches 0 then remove enemy from array and scene and increment kill count by 1
+	scene.remove(enemies[t]);
+	scene.remove(enemies[t].healthBar);
+	enemies.splice(t,1);
+	player.kills+=1;
+	$('#kills').html(player.kills);// updating kills on HTML document 
+	}
+	//change color of health bar according to health
+	else if (enemies[t].health<=25)
+	enemies[t].healthBar.material.color.set (0xff2b00);
+	
+	else if(enemies[t].health<=50)
+	enemies[t].healthBar.material.color.set (0xff5c00);
+	
+	else if(enemies[t].health<=75)
+	enemies[t].healthBar.material.color.set (0x2196f3);
+	
+	col=false;//sets collision to false for next function call
+		}	
+	}
+	
+	if (enemies.length<30)//generates new enemy if the amount of enemy is less then 30
+	addAI();
+	//move torch with player camera
+		light.position.x=camera.position.x-0.5;
+	    light.position.z=camera.position.z;
+	
+	// position the gun in front of the camera
+	meshes["playerweapon"].position.set(
+		camera.position.x - Math.sin(camera.rotation.y + Math.PI/6) * 0.75,
+		camera.position.y - 0.5 + Math.sin(time*4 + camera.position.x + camera.position.z)*0.01,
+		camera.position.z + Math.cos(camera.rotation.y + Math.PI/6) * 0.75
+	);
+	meshes["playerweapon"].rotation.set(
+		camera.rotation.x,
+		camera.rotation.y - Math.PI,
+		camera.rotation.z
+);
+
+	//render scene
+	renderer.render(scene, camera);
+		
+	}
+//checks for key presses
+function keyDown(event){
+	keyboard[event.keyCode] = true;
+}
+
+function keyUp(event){
+	keyboard[event.keyCode] = false;
+}
+
+window.addEventListener('keydown', keyDown);
+window.addEventListener('keyup', keyUp);
+
+window.onload = init;
+</script>
+</body>
+</html>

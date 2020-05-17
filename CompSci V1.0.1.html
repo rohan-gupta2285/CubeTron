@@ -1,0 +1,529 @@
+<html>
+<head>
+<title>My first Three.js app</title>
+<style>canvas { width: 100%; height: 100% }</style>
+</head>
+<body>
+<script src="three.js/build/three.min.js"></script>
+<script>
+var scene, camera, renderer, mesh;
+var floor,roof, backW, ambientLight, light;
+var length;
+var bName=1;//info for branch generation
+var genx=0; //saves coordinates for generation
+var genz=0;
+
+var meshTexture, meshNormalMap, meshBumpMap;
+var wall, wall1, wall2, wall3, wall4, wall5,wall6;
+var keyboard = {};
+var player = { height:1.8, speed:0.2, turnSpeed:Math.PI*0.02 }; //object to store player data
+var USE_WIREFRAME = false; //toggles the wireframe
+
+function init(){
+	scene = new THREE.Scene();
+	camera = new THREE.PerspectiveCamera(90, window.innerWidth/window.innerHeight, 0.1, 1000);
+	
+		var textureLoader= new THREE.TextureLoader();
+	meshTexture = new textureLoader.load ("Textures/crate1/crate1_diffuse.png");
+	meshBumpMap = new textureLoader.load ("Textures/crate1/crate1_bump.png");
+	meshNormalMap = new textureLoader.load ("Textures/crate1/crate1_normal.png");
+	
+	mesh = new THREE.Mesh(
+		new THREE.BoxGeometry(1,1,1),
+		new THREE.MeshPhongMaterial({color:0xffffff,map:meshTexture})
+	);
+
+	
+	scene.add(mesh);
+	mesh.position.y += 0.5; // Move the mesh up 0.5 meters
+	//mesh can cast and recieve shadows
+	mesh.receiveShadow = true; 
+	mesh.castShadow = true;
+	
+	
+	
+	
+floor = new THREE.Mesh(
+		new THREE.PlaneGeometry(10000,10000),
+		new THREE.MeshPhongMaterial({color:0xffffff, wireframe:USE_WIREFRAME})
+	);
+	floor.rotation.x -= Math.PI / 2; // Rotate the floor 90 degrees
+	floor.position.z+=100/2-5;
+	floor.receiveShadow = true; //Floor can have shadows cast onto it
+	scene.add(floor);
+	
+	roof = new THREE.Mesh(
+		new THREE.PlaneGeometry(10000,10000),
+		new THREE.MeshPhongMaterial({color:0xffffff, wireframe:USE_WIREFRAME})
+	);
+	roof.rotation.x += Math.PI / 2; // Rotate the floor 90 degrees
+	roof.position.y+=5;
+	roof.position.z+=100/2-5;
+	roof.receiveShadow = false; //Floor can have shadows cast onto it
+	scene.add(roof);
+	
+	//main lighting
+	ambientLight= new THREE.AmbientLight (0xffffff,0.2);
+	scene.add(ambientLight);
+	
+	light =new THREE.PointLight (0xffffff, 0.8, 18);
+	light.position.set(0.5, player.height, -5);
+	light.castShadow = true;
+	//light will not act on anything closer than 0.1 m or farther than 25m
+	light.shadow.camera.near=0.1;
+	light.shadow.camera.far=25;
+	scene.add(light);
+	
+	function branch1(){
+	length= Math.floor(Math.random()*40)+10;
+	wall=new THREE.Mesh (
+	new THREE.PlaneGeometry(length,5,1),
+	new THREE.MeshPhongMaterial ({color:0xffffff})
+	);
+	wall.rotation.y-=Math.PI/2;
+		wall.position.y+=2.5;
+		wall.position.x+=2.5;
+		wall.position.z+=length/2-5;
+		wall.receiveShadow = true; 
+	    wall.castShadow = true;
+	scene.add (wall);
+
+	wall1=new THREE.Mesh (
+	new THREE.PlaneGeometry(length,5,1),
+	new THREE.MeshPhongMaterial ({color:0xffffff})
+	);
+	wall1.rotation.y+=Math.PI/2;
+		wall1.position.y+=2.5;
+		wall1.position.x+=-2.5;
+		wall1.position.z+=length/2-5;
+		wall1.receiveShadow = true; 
+	    wall1.castShadow = true;
+	scene.add (wall1);
+	
+		backW=new THREE.Mesh (
+	new THREE.PlaneGeometry(5,5,1),
+	new THREE.MeshPhongMaterial ({color:0xffffff})
+	);
+		backW.position.y+=2.5;
+		backW.position.z+=-5;
+		backW.receiveShadow = true; 
+	    backW.castShadow = true;
+	scene.add (backW);
+	genz+=length;
+	}
+	
+	function branch2 () {
+	length= Math.floor(Math.random()*40)+10;
+	wall=new THREE.Mesh (
+	new THREE.PlaneGeometry(length,5,1),
+	new THREE.MeshPhongMaterial ({color:0xffffff})
+	);
+	wall.rotation.y-=Math.PI/2;
+		wall.position.y+=2.5;
+		wall.position.x+=2.5;
+		wall.position.z+=length/2+genz;
+		wall.receiveShadow = true; 
+	    wall.castShadow = true;
+	scene.add (wall);
+
+	wall1=new THREE.Mesh (
+	new THREE.PlaneGeometry(length+5,5,1),
+	new THREE.MeshPhongMaterial ({color:0xffffff})
+	);
+	wall1.rotation.y+=Math.PI/2;
+		wall1.position.y+=2.5;
+		wall1.position.x+=-2.5;
+		wall1.position.z+=length/2+genz-2.5;
+		wall1.receiveShadow = true; 
+	    wall1.castShadow = true;
+	scene.add (wall1);
+	
+	
+	wall2= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall2.position.y+=2.5;
+		wall2.position.x+=length/2+2.5;
+		wall2.position.z+=genz-5;
+		wall2.receiveShadow = true; 
+	    wall2.castShadow = true;
+	scene.add (wall2);
+	
+		wall3= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall3.position.y+=2.5;
+		wall3.position.x+=length/2+2.5;
+		wall3.position.z+=genz;
+		wall3.rotation.y+=Math.PI;
+		wall3.receiveShadow = true; 
+	    wall3.castShadow = true;
+	scene.add (wall3);
+}
+	
+	function branch3 () {
+	length= Math.floor(Math.random()*40)+10;
+		wall=new THREE.Mesh (
+	new THREE.PlaneGeometry(length,5,1),
+	new THREE.MeshPhongMaterial ({color:0xffffff})
+	);
+	wall.rotation.y-=Math.PI/2;
+		wall.position.y+=2.5;
+		wall.position.x+=2.5;
+		wall.position.z+=length/2+genz;
+		wall.receiveShadow = true; 
+	    wall.castShadow = true;
+	scene.add (wall);
+
+	wall1=new THREE.Mesh (
+	new THREE.PlaneGeometry(length,5,1),
+	new THREE.MeshPhongMaterial ({color:0xffffff})
+	);
+	wall1.rotation.y+=Math.PI/2;
+		wall1.position.y+=2.5;
+		wall1.position.x+=-2.5;
+		wall1.position.z+=length/2+genz;
+		wall1.receiveShadow = true; 
+	    wall1.castShadow = true;
+	scene.add (wall1);
+	
+	
+	wall2= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall2.position.y+=2.5;
+		wall2.position.x+=length/2+2.5;
+		wall2.position.z+=genz-5;
+		wall2.receiveShadow = true; 
+	    wall2.castShadow = true;
+	scene.add (wall2);
+	
+		wall3= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall3.position.y+=2.5;
+		wall3.position.x+=length/2+2.5;
+		wall3.position.z+=genz;
+		wall3.rotation.y+=Math.PI;
+		wall3.receiveShadow = true; 
+	    wall3.castShadow = true;
+	scene.add (wall3);
+	
+		wall4= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall4.position.y+=2.5;
+		wall4.position.x-=length/2+2.5;
+		wall4.position.z+=genz-5;
+		wall4.receiveShadow = true; 
+	    wall4.castShadow = true;
+	scene.add (wall4);
+	
+		wall5= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall5.position.y+=2.5;
+		wall5.position.x-=length/2+2.5;
+		wall5.position.z+=genz;
+		wall5.rotation.y+=Math.PI;
+		wall5.receiveShadow = true; 
+	    wall5.castShadow = true;
+	scene.add (wall5);
+	genz+=length;
+	}
+	
+	
+	function branch4() {
+	length= Math.floor(Math.random()*40)+10;
+wall=new THREE.Mesh (
+	new THREE.PlaneGeometry(length+5,5,1),
+	new THREE.MeshPhongMaterial ({color:0xffffff})
+	);
+	wall.rotation.y-=Math.PI/2;
+		wall.position.y+=2.5;
+		wall.position.x+=2.5;
+		wall.position.z+=length/2+genz-2.5;
+		wall.receiveShadow = true; 
+	    wall.castShadow = true;
+	scene.add (wall);
+
+	wall1=new THREE.Mesh (
+	new THREE.PlaneGeometry(length,5,1),
+	new THREE.MeshPhongMaterial ({color:0xffffff})
+	);
+	wall1.rotation.y+=Math.PI/2;
+		wall1.position.y+=2.5;
+		wall1.position.x+=-2.5;
+		wall1.position.z+=length/2+genz;
+		wall1.receiveShadow = true; 
+	    wall1.castShadow = true;
+	scene.add (wall1);
+
+	
+		wall4= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall4.position.y+=2.5;
+		wall4.position.x-=length/2+2.5;
+		wall4.position.z+=genz-5;
+		wall4.receiveShadow = true; 
+	    wall4.castShadow = true;
+	scene.add (wall4);
+	
+		wall5= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall5.position.y+=2.5;
+		wall5.position.x-=length/2+2.5;
+		wall5.position.z+=genz;
+		wall5.rotation.y+=Math.PI;
+		wall5.receiveShadow = true; 
+	    wall5.castShadow = true;
+	scene.add (wall5);
+}	
+
+function branch5 () {
+	length= Math.floor(Math.random()*40)+10;
+	
+	wall2= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall2.position.y+=2.5;
+		wall2.position.x+=length/2+2.5;
+		wall2.position.z+=genz-5;
+		wall2.receiveShadow = true; 
+	    wall2.castShadow = true;
+	scene.add (wall2);
+	
+		wall3= new THREE.Mesh (
+	new THREE.PlaneGeometry (length+5,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall3.position.y+=2.5;
+		wall3.position.x+=length/2;
+		wall3.position.z+=genz;
+		wall3.rotation.y+=Math.PI;
+		wall3.receiveShadow = true; 
+	    wall3.castShadow = true;
+	scene.add (wall3);
+	
+	wall6=new THREE.Mesh (
+	new THREE.PlaneGeometry(5,5,1),
+	new THREE.MeshPhongMaterial ({color:0xffffff})
+	);
+	wall6.rotation.y+=Math.PI/2;
+		wall6.position.y+=2.5;
+		wall6.position.x-=2.5;
+		wall6.position.z+=genz-2.5;
+		wall6.receiveShadow = true; 
+	    wall6.castShadow = true;
+	scene.add (wall6);
+}
+
+function branch6 () {
+	length= Math.floor(Math.random()*40)+10;
+	
+	wall2= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall2.position.y+=2.5;
+		wall2.position.x-=length/2+2.5;
+		wall2.position.z+=genz-5;
+		wall2.receiveShadow = true; 
+	    wall2.castShadow = true;
+	scene.add (wall2);
+	
+		wall3= new THREE.Mesh (
+	new THREE.PlaneGeometry (length+5,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall3.position.y+=2.5;
+		wall3.position.x-=length/2;
+		wall3.position.z+=genz;
+		wall3.rotation.y+=Math.PI;
+		wall3.receiveShadow = true; 
+	    wall3.castShadow = true;
+	scene.add (wall3);
+	
+	wall6=new THREE.Mesh (
+	new THREE.PlaneGeometry(5,5,1),
+	new THREE.MeshPhongMaterial ({color:0xffffff})
+	);
+	wall6.rotation.y-=Math.PI/2;
+		wall6.position.y+=2.5;
+		wall6.position.x+=2.5;
+		wall6.position.z+=genz-2.5;
+		wall6.receiveShadow = true; 
+	    wall6.castShadow = true;
+	scene.add (wall6);
+}
+
+function branch7 (){
+
+wall2= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall2.position.y+=2.5;
+		wall2.position.x+=length/2+2.5;
+		wall2.position.z+=genz-5;
+		wall2.receiveShadow = true; 
+	    wall2.castShadow = true;
+	scene.add (wall2);
+	
+		wall3= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall3.position.y+=2.5;
+		wall3.position.x+=length/2+2.5;
+		wall3.position.z+=genz;
+		wall3.rotation.y+=Math.PI;
+		wall3.receiveShadow = true; 
+	    wall3.castShadow = true;
+	scene.add (wall3);
+	
+		wall4= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall4.position.y+=2.5;
+		wall4.position.x-=length/2+2.5;
+		wall4.position.z+=genz-5;
+		wall4.receiveShadow = true; 
+	    wall4.castShadow = true;
+	scene.add (wall4);
+	
+		wall5= new THREE.Mesh (
+	new THREE.PlaneGeometry (length,5,1),
+	new THREE. MeshPhongMaterial({color:0xffffff})
+	);
+	    wall5.position.y+=2.5;
+		wall5.position.x-=length/2+2.5;
+		wall5.position.z+=genz;
+		wall5.rotation.y+=Math.PI;
+		wall5.receiveShadow = true; 
+	    wall5.castShadow = true;
+	scene.add (wall5);
+	
+	backW=new THREE.Mesh (
+	new THREE.PlaneGeometry(5,5,1),
+	new THREE.MeshPhongMaterial ({color:0xffffff})
+	);
+	backW.rotation.y+= Math.PI;
+		backW.position.y+=2.5;
+		backW.position.z+=genz;
+		backW.receiveShadow = true; 
+	    backW.castShadow = true;
+	scene.add (backW);
+	
+	}
+
+
+//random maze generation
+for(var i=0; i < 2; i++){
+		if (bName===1){
+		branch1();
+		//bName=Math.floor(Math.random()*6)+1;
+		bName=7;
+		}
+		else if (bName===2){
+		branch2();
+		}
+		else if (bName===3){
+		branch3();
+		}
+		else if (bName===4){
+		branch4();
+		}
+		else if (bName===5){
+		branch5();
+		}
+		else if (bName===6){
+		branch6();
+		}
+		else if (bName===7){
+		branch7();
+		}
+	}
+	
+	camera.position.set(0, player.height, -2);
+	camera.lookAt(new THREE.Vector3(0,player.height,0));
+	
+	renderer = new THREE.WebGLRenderer();
+	renderer.setSize(window.innerWidth, window.innerHeight);
+	
+	//Enable shadows in renderer
+	renderer.shadowMap.enabled=true;
+	renderer.shadowMap.type=THREE.BasicShadowMap;
+	
+	document.body.appendChild(renderer.domElement);
+	
+	animate();
+}
+
+function animate(){
+	requestAnimationFrame(animate);
+	
+	//mesh.rotation.x += 0.01;
+	mesh.rotation.y += 0.02;
+	
+	// Keyboard movement inputs
+	if(keyboard[87]){ // W key
+		camera.position.x -= Math.sin(camera.rotation.y) * player.speed;
+		camera.position.z -= -Math.cos(camera.rotation.y) * player.speed;
+		
+	}
+	if(keyboard[83]){ // S key
+		camera.position.x += Math.sin(camera.rotation.y) * player.speed;
+		camera.position.z += -Math.cos(camera.rotation.y) * player.speed;
+	}
+	if(keyboard[65]){ // A key
+		// Redirect motion by 90 degrees
+		camera.position.x += Math.sin(camera.rotation.y + Math.PI/2) * player.speed;
+		camera.position.z += -Math.cos(camera.rotation.y + Math.PI/2) * player.speed;
+	}
+	if(keyboard[68]){ // D key
+		camera.position.x += Math.sin(camera.rotation.y - Math.PI/2) * player.speed;
+		camera.position.z += -Math.cos(camera.rotation.y - Math.PI/2) * player.speed;
+	}
+	light.position.x=camera.position.x+0.5;
+	light.position.z=camera.position.z;
+	
+	// Keyboard turn inputs
+	if(keyboard[37]){ // left arrow key
+		camera.rotation.y -= player.turnSpeed;
+	}
+	if(keyboard[39]){ // right arrow key
+		camera.rotation.y += player.turnSpeed;
+	}
+	
+	renderer.render(scene, camera);
+		
+	}
+
+function keyDown(event){
+	keyboard[event.keyCode] = true;
+}
+
+function keyUp(event){
+	keyboard[event.keyCode] = false;
+}
+
+window.addEventListener('keydown', keyDown);
+window.addEventListener('keyup', keyUp);
+
+window.onload = init;
+</script>
+</body>
+</html>
